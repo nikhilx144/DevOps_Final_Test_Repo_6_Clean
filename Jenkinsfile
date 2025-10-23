@@ -65,7 +65,7 @@ pipeline {
             echo '🎉 Open the site in your browser using the EC2 Public IP or DNS.'
         }
         failure {
-            echo '❌ Build or deployment failed!'
+            echo '❌ Build or deployment failed! '
         }
     }
 }
