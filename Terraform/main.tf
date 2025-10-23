@@ -56,6 +56,13 @@ resource "aws_security_group" "web_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    from_port   = 9100
+    to_port     = 9100
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # (for testing only; later restrict to Prometheus EC2)
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -98,37 +105,73 @@ resource "aws_instance" "web" {
   security_groups         = [aws_security_group.web_sg.name]
 
   user_data = <<-EOF
-              #!/bin/bash
-              # Update and install Docker
-              yum update -y
-              amazon-linux-extras install docker -y
+    #!/bin/bash
+    # ------------------------------
+    # 1. System Update + Docker Install
+    # ------------------------------
+    yum update -y
+    amazon-linux-extras install docker -y
 
-              # Enable Docker on boot
-              systemctl enable docker
-              systemctl start docker
+    # Enable Docker on boot
+    systemctl enable docker
+    systemctl start docker
 
-              # Add ec2-user to Docker group
-              usermod -a -G docker ec2-user
+    # Add ec2-user to Docker group
+    usermod -a -G docker ec2-user
 
-              # Wait for Docker to start
-              sleep 10
+    # Wait for Docker to start
+    sleep 10
 
-              # ECR login, pull image, and run container
-              REGION=${var.region}
-              REPO=${var.ecr_repo_url}
+    # ------------------------------
+    # 2. ECR Login and Run App Container
+    # ------------------------------
+    REGION=${var.region}
+    REPO=${var.ecr_repo_url}
 
-              aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $REPO
-              docker pull $REPO
+    aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $REPO
+    docker pull $REPO
 
-              # Stop existing container if any
-              if [ $(docker ps -q -f name=college-website) ]; then
-                docker stop college-website
-                docker rm college-website
-              fi
+    # Stop existing container if running
+    if [ $(docker ps -q -f name=college-website) ]; then
+      docker stop college-website
+      docker rm college-website
+    fi
 
-              # Run container
-              docker run -d --name college-website -p 80:80 $REPO
-              EOF
+    # Run container on port 80
+    docker run -d --name college-website -p 80:80 $REPO
+
+    # ------------------------------
+    # 3. Install Prometheus Node Exporter
+    # ------------------------------
+    cd /opt
+    wget https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-amd64.tar.gz
+    tar xvf node_exporter-1.8.2.linux-amd64.tar.gz
+    cd node_exporter-1.8.2.linux-amd64
+
+    # Start Node Exporter as a background process
+    nohup ./node_exporter > /var/log/node_exporter.log 2>&1 &
+
+    # ------------------------------
+    # 4. Optional: Enable Node Exporter on reboot
+    # ------------------------------
+    cat <<EOT > /etc/systemd/system/node_exporter.service
+    [Unit]
+    Description=Prometheus Node Exporter
+    After=network.target
+
+    [Service]
+    ExecStart=/opt/node_exporter-1.8.2.linux-amd64/node_exporter
+    User=root
+
+    [Install]
+    WantedBy=default.target
+    EOT
+
+    systemctl daemon-reload
+    systemctl enable node_exporter
+    systemctl start node_exporter
+  EOF
+
 
   tags = {
     Name = "CollegeWebsite-EC2"
