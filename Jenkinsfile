@@ -10,7 +10,7 @@ pipeline {
     stages {
         stage('Clone Repository') {
             steps {
-                echo '📦 Cloning repository...'
+                echo '📦 Cloning repository... '
                 git branch: 'master', url: 'https://github.com/nikhilx144/DevOps_Final_Test_Repo_6_Clean.git'
             }
         }
