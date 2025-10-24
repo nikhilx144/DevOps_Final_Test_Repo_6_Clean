@@ -107,9 +107,7 @@ pipeline {
                                 sudo docker rm -f prometheus || true
 
                                 # Run Prometheus container
-                                sudo docker run -d --name prometheus -p 9090:9090 \
-                                    -v /etc/prometheus:/etc/prometheus \
-                                    prom/prometheus --config.file=/etc/prometheus/prometheus.yml
+                                sudo docker run -d --name prometheus -p 9090:9090 -v /etc/prometheus:/etc/prometheus prom/prometheus --config.file=/etc/prometheus/prometheus.yml
                             '
                         """
                     }
