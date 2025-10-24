@@ -83,35 +83,37 @@ pipeline {
                     sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY_FILE')
                 ]) {
                     dir('Terraform') {
-                        sh '''
+                        sh """
                             export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                             export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 
-                            PROMETHEUS_IP=$(terraform output -raw prometheus_public_ip)
-                            echo "📂 Copying Prometheus configuration..."
-                            scp -i $KEY_FILE -o StrictHostKeyChecking=no prometheus/prometheus.yml ec2-user@$PROMETHEUS_IP:/home/ec2-user/
+                            PROMETHEUS_IP=\$(terraform output -raw prometheus_public_ip)
+                            echo "📂 Copying Prometheus configuration to \$PROMETHEUS_IP ..."
+                            scp -i \$KEY_FILE -o StrictHostKeyChecking=no prometheus/prometheus.yml ec2-user@\$PROMETHEUS_IP:/home/ec2-user/
 
-                            echo "🚀 Starting Prometheus container..."
-                            ssh -i $KEY_FILE -o StrictHostKeyChecking=no ec2-user@$PROMETHEUS_IP << 'EOF'
+                            echo "🚀 Starting Prometheus container on remote EC2..."
+                            ssh -i \$KEY_FILE -o StrictHostKeyChecking=no ec2-user@\$PROMETHEUS_IP '
+                                set -e
                                 sudo mkdir -p /etc/prometheus
                                 sudo cp /home/ec2-user/prometheus.yml /etc/prometheus/prometheus.yml
                                 sudo chown -R ec2-user:ec2-user /etc/prometheus
                                 sudo chmod 644 /etc/prometheus/prometheus.yml
-                                
-                                # Remove any previous container
+
+                                echo "🧹 Cleaning up old Prometheus container if exists..."
                                 sudo docker rm -f prometheus || true
-                                
-                                # Run Prometheus container properly
-                                sudo docker run -d --name prometheus -p 9090:9090 \
-                                    -v /etc/prometheus:/etc/prometheus \
+
+                                echo "🐳 Running new Prometheus container..."
+                                sudo docker run -d --name prometheus -p 9090:9090 \\
+                                    -v /etc/prometheus:/etc/prometheus \\
                                     prom/prometheus --config.file=/etc/prometheus/prometheus.yml
-                            EOF
-                        '''
+
+                                echo "✅ Prometheus is running on port 9090!"
+                            '
+                        """
                     }
                 }
             }
         }
-
     }
 
     post {
@@ -120,7 +122,7 @@ pipeline {
             echo '🎉 Open the site in your browser using the EC2 Public IP or DNS.'
         }
         failure {
-            echo '❌ Build or deployment failed! '
+            echo '❌ Build or deployment failed!'
         }
     }
 }
