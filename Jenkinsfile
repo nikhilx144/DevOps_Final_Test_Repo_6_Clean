@@ -57,6 +57,23 @@ pipeline {
                 }
             }
         }
+
+        stage('Deploy Prometheus EC2') {
+            steps {
+                echo '📊 Deploying Prometheus EC2 instance...'
+                withCredentials([usernamePassword(credentialsId: 'aws-username-pass-access-key', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                    dir('Terraform') {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+
+                            terraform init -reconfigure
+                            terraform apply -auto-approve -target=aws_instance.prometheus
+                        '''
+                    }
+                }
+            }
+        }
     }
 
     post {
