@@ -79,21 +79,23 @@ pipeline {
             steps {
                 echo '⚙️ Setting up Prometheus EC2 and configuration...'
                 withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY_FILE')]) {
-                    sh '''
-                        PROMETHEUS_IP=$(terraform output -raw prometheus_public_ip)
+                    dir('Terraform') {
+                        sh '''
+                            PROMETHEUS_IP=$(terraform output -raw prometheus_public_ip)
 
-                        echo "📂 Copying Prometheus configuration..."
-                        scp -i $KEY_FILE -o StrictHostKeyChecking=no prometheus/prometheus.yml ec2-user@$PROMETHEUS_IP:/home/ec2-user/
+                            echo "📂 Copying Prometheus configuration..."
+                            scp -i $KEY_FILE -o StrictHostKeyChecking=no prometheus/prometheus.yml ec2-user@$PROMETHEUS_IP:/home/ec2-user/
 
-                        echo "🚀 Starting Prometheus container..."
-                        ssh -i $KEY_FILE -o StrictHostKeyChecking=no ec2-user@$PROMETHEUS_IP << 'EOF'
-                            sudo mkdir -p /etc/prometheus
-                            sudo mv /home/ec2-user/prometheus.yml /etc/prometheus/prometheus.yml
-                            sudo docker rm -f prometheus || true
-                            sudo docker run -d --name prometheus -p 9090:9090 \
-                                -v /etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus
-                        EOF
-                    '''
+                            echo "🚀 Starting Prometheus container..."
+                            ssh -i $KEY_FILE -o StrictHostKeyChecking=no ec2-user@$PROMETHEUS_IP << 'EOF'
+                                sudo mkdir -p /etc/prometheus
+                                sudo mv /home/ec2-user/prometheus.yml /etc/prometheus/prometheus.yml
+                                sudo docker rm -f prometheus || true
+                                sudo docker run -d --name prometheus -p 9090:9090 \
+                                    -v /etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus
+                            EOF
+                        '''
+                    }
                 }
             }
         }
