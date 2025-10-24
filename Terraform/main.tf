@@ -7,7 +7,6 @@ provider "aws" {
 # ------------------------------
 resource "aws_iam_role" "ec2_role" {
   name = "ec2-ecr-access-role"
-
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -60,7 +59,7 @@ resource "aws_security_group" "web_sg" {
     from_port   = 9100
     to_port     = 9100
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # (for testing only; later restrict to Prometheus EC2)
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
