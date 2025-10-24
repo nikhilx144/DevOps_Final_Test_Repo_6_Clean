@@ -84,19 +84,13 @@ pipeline {
                 ]) {
                     dir('Terraform') {
                         sh '''
-                            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-
                             PROMETHEUS_IP=$(terraform output -raw prometheus_public_ip)
                             echo "📂 Copying Prometheus configuration..."
                             scp -i $KEY_FILE -o StrictHostKeyChecking=no prometheus/prometheus.yml ec2-user@$PROMETHEUS_IP:/home/ec2-user/
 
                             echo "🚀 Starting Prometheus container..."
-                            ssh -i $KEY_FILE -o StrictHostKeyChecking=no ec2-user@$PROMETHEUS_IP bash << EOF
-                                # Create config directory
+                            ssh -i $KEY_FILE -o StrictHostKeyChecking=no ec2-user@$PROMETHEUS_IP "
                                 sudo mkdir -p /etc/prometheus
-
-                                # Move the config file and fix permissions
                                 sudo mv /home/ec2-user/prometheus.yml /etc/prometheus/prometheus.yml
                                 sudo chown -R ec2-user:ec2-user /etc/prometheus
                                 sudo chmod 644 /etc/prometheus/prometheus.yml
@@ -105,15 +99,16 @@ pipeline {
                                 sudo docker rm -f prometheus || true
 
                                 # Run Prometheus container
-                                sudo docker run -d --name prometheus -p 9090:9090 \\
-                                    -v /etc/prometheus:/etc/prometheus \\
+                                sudo docker run -d --name prometheus -p 9090:9090 \
+                                    -v /etc/prometheus:/etc/prometheus \
                                     prom/prometheus --config.file=/etc/prometheus/prometheus.yml
-                            EOF
+                            "
                         '''
                     }
                 }
             }
         }
+
 
     }
 
